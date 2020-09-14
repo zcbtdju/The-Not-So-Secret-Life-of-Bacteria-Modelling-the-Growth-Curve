@@ -1,0 +1,146 @@
+include gro
+
+fp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/death_info_2.csv", "w" );
+sp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/death_stats_2.csv", "w" );
+
+set("ecoli_growth_rate",0.0);
+set ("dt", 1);
+set("population_max", 20000);
+
+fun div x y . x / y;
+fun dormancy a b c d . a * b *((2.71828)^(c * d));
+fun cell_death a b c . a * b * ((2.71828)^((-b*c)));
+fun statistics L .
+	let n := length(L), mu := (sumlist L) / n in
+		[ num := n, mean := mu, std := sqrt (sumlist (map (\ x . (x-mu)^2) L) / n), sum := sumlist L ]
+	end;
+fun cell_death a b c d . a * ((2.71828)^(-((b*c)-(c*d))));
+fun cell_death_2 a b c . a * ((2.71828)^(- b * c ));
+fun death_miu_rate a . 0.21 * ((2.71828)^( 1 * a ));
+
+num_cells := 1000;
+
+dead_cells := 0;
+total_cells := 0;
+
+timestep := 0.01;
+
+pop_decay := 0;
+miu_max := 1.040;	// per hour
+
+program p() := {
+
+r := [t:=0, s:=0];
+	true :{r.t := r.t + dt, r.s := r.s + dt}	
+	
+	time := 0;
+	mode := 0;
+	gfp := 0;
+	death_rate := 0;
+	
+	true : {death_rate := (death_miu_rate miu_max)*0.0006944444}
+	true : {time := r.t + 1}
+	true : {total_cells := num_cells - dead_cells}
+	
+r.t >= 0 : {pop_decay := num_cells - (cell_death_2 num_cells death_rate time)}
+
+	pop_decay > dead_cells & rate (1) :{
+		die(), dead_cells := dead_cells + 1
+		}
+
+	daughter : {num_cells := id + 1}
+	
+	selected :{
+	print("Time=", r.s, "id=", id, "volume=", volume, "death_rate=", death_rate, "num_cells", num_cells, "dead_cells=", dead_cells,
+	"total_cells=", total_cells, "pop_decay=", pop_decay, "time=", time)
+	}
+
+
+//r.t = 200 :{
+//		r.t := 0,
+//		fprint (cp, r.s, ", ", mode, ", ", num_cells, ", ", ext_glucose, ", ", glycogen_store, "\n")
+//		}
+
+//r.s >= 1 :{
+//		r.s := 0,
+//		fprint (fp, r.t, ", ", id, ", ", num_cells, ", ", mode, "\n")
+//		}
+
+};
+
+program main() := {
+
+	percentage_dormant := 0;
+	t := 0;
+	s := 0;
+	
+	true : {t := t + dt, s := s + dt}
+		
+t >= 0 : {
+    t := 0,
+    clear_messages(1),
+    message ( 1, "Cells = " <> tostring(num_cells) <> "." ),
+	};
+
+//repeat
+
+	m := 0;
+	n := 0;
+	
+	
+m = 0 & n < 11 : {
+
+//ecoli ([x:=0, y:=0], program p());
+
+	
+foreach q in range num_cells do
+ecoli ( [ 
+x := rand(600)-300, 
+y := rand(600)-300, 
+theta := 0.01*rand(314) ], 
+program p())
+end,
+	
+	num_cells := 1000,
+	dead_cells := 0,
+	total_cells := 1,
+	m := 1
+}
+
+m = 0 & n = 11 : {
+	exit()
+}
+
+//m = 1 & t < 50 :{
+//	set("dt",0.01)}
+//m = 1 & t > 50 :{
+//	set("dt",1)}
+
+
+m = 1 & t > 100000 : {
+	//print ( "End: Cells=", cells, " ,Diffusion=", a, " ,Degradation=", b),
+	reset(),
+	t := 0,
+	n := n + 1,
+	//fprint (cp, n, ", ", num_cells, ", ", dor_cells, ", ", dead_cells, "\n"),
+	m := 0
+}
+
+//Record
+
+L := {};
+Li := {};
+stats := [num := 0, mean := 0, std := 0, sum := 0];
+
+s >= 1 & m = 1 :{
+		s := 0,
+		L := maptocells gfp end,
+		stats := statistics L,
+		fprint (sp, n, ", ", t, ", ", stats.num, ", ", stats.mean, ", ", stats.std, ", ", stats.sum, ", ", num_cells, "\n")
+		//fprint (cp, t, ", ", n, ", ", num_cells, ", ", ext_glucose, ", ", dead_cells, "\n")
+		}
+
+};
+
+//ecoli ([x:=0, y:=0], program p());
+

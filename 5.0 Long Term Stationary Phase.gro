@@ -1,0 +1,195 @@
+include gro
+
+fp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/ltsp_info.csv", "w" );
+sp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/ltsp_stats.csv", "w" );
+
+set("ecoli_growth_rate",0.0);
+set ("dt", 1);
+set("population_max", 20000);
+
+fun div x y . x / y;
+fun dormancy a b c d . a * b *((2.71828)^(c * d));
+fun cell_death a b c . a * b * ((2.71828)^((-b*c)));
+fun statistics L .
+	let n := length(L), mu := (sumlist L) / n in
+		[ num := n, mean := mu, std := sqrt (sumlist (map (\ x . (x-mu)^2) L) / n), sum := sumlist L ]
+	end;
+
+
+glycogen_limit := 41891294.09;
+ext_glucose := 3.34E+22;
+
+glucose_uti_expo := 1.8E+10;
+
+glucose_uti_lag := 397050.5333;
+glucose_uti_tran := 795934.5877;
+glucose_uti_stationary := 397050.5333;
+glucose_uti_death := 102457.6389;
+glucose_uti_dormant := 1024.576389;
+
+avg_proteins := 3.113965768E+9;	//*100% of average proteins converted into glucose
+avg_volume := 2.611559094;
+percent_consumption := 0.75;
+
+num_cells := 1;
+
+dor_cells := 0;
+max_cells := 10;
+dead_cells := 0;
+total_cells := 0;
+
+timestep := 0.01;
+
+genome:= 4.5E+6;			//bp
+mutation_r := 2.0E-10; 		//mutations per bp per generation
+
+mutation := 0;
+a := 1;
+mutant := 1;
+
+program p() := {
+
+r := [t:=0, s:=0];
+	true :{r.t := r.t + dt, r.s := r.s + dt}	
+	
+	mode := 0;
+	restart := 0;
+	keep := 0;
+	
+	gfp := 0;
+	yfp := 0;
+	cfp := 0;
+	rfp := 0;
+	
+r.t < 10 : {set("ecoli_growth_rate", 0.0034)}
+r.t > 1500 : {set("ecoli_growth_rate", 0.0)}
+
+
+mutation = 14400 : {mode := a + 1, restart := 1, keep := 1.0E+10}
+mutation = 14398 & keep > 0 : {keep := 0}
+
+r.t > 14398 & keep = 0 & rate (0.00005) : {die(), num_cells - 1}
+keep > 0 : {set("ecoli_growth_rate", 0.00035)} 
+
+keep > 0 & rate (100) : {mode := a + 1}
+
+mode = 2 : {gfp := volume*0, rfp := volume*0, yfp := volume*10, cfp := volume*20}
+
+mode = 3 : {gfp := volume*10, rfp := volume*25, yfp := volume*0, cfp := volume*0}
+
+mode = 4 : {gfp := volume*0, rfp := volume*0, yfp := volume*0, cfp := volume*15}
+
+mode = 5 : {gfp := volume*0, rfp := volume*0, yfp := volume*15, cfp := volume*0}
+
+mode = 6 : {gfp := volume*0, rfp := volume*15, yfp := volume*0, cfp := volume*0}
+
+mode = 7 : {gfp := volume*15, rfp := volume*0, yfp := volume*0, cfp := volume*0}
+
+
+
+//mode = 1 : {gfp := volume*50, set}
+
+restart = 1 : {mutation := 0, a := a + 1}
+mutation = 0 : {restart := 0}
+
+	daughter : {num_cells := id + 1}
+	
+	selected :{
+	print("Time=", r.s, "id=", id, "volume=", volume, "mode=", mode, "mutation", mutation, "mutant=", mutant,
+	"restart=", restart)
+	}
+
+
+
+//r.t = 200 :{
+//		r.t := 0,
+//		fprint (cp, r.s, ", ", mode, ", ", num_cells, ", ", ext_glucose, ", ", glycogen_store, "\n")
+//		}
+
+r.s >= 100 :{
+		r.s := 0,
+		fprint (fp, r.t, ", ", id, ", ", num_cells, ", ", mode, "\n")
+		}
+
+};
+
+program main() := {
+
+	percentage_dormant := 0;
+	t := 0;
+	s := 0;
+	
+	true : {t := t + dt, s := s + dt}
+	
+	true : {mutation := mutation + 1}
+	
+t >= 0 : {
+    t := 0,
+    clear_messages(1),
+    message ( 1, "Cells = " <> tostring(num_cells) <> "." ),
+	};
+
+//repeat
+
+	m := 0;
+	n := 0;
+	
+	
+m = 0 & n < 11 : {
+
+ecoli ([x:=0, y:=0], program p());
+
+	
+//foreach q in range num_cells do
+//ecoli ( [ 
+//x := rand(500)-250, 
+//y := rand(500)-250, 
+//theta := 0.01*rand(314) ], 
+//program p())
+//end,
+	
+	num_cells := 1,
+	dor_cells := 0,
+	max_cells := 1000,
+	dead_cells := 0,
+	total_cells := 1,
+	m := 1
+}
+
+m = 0 & n = 11 : {
+	exit()
+}
+
+//m = 1 & t < 50 :{
+//	set("dt",0.01)}
+//m = 1 & t > 50 :{
+//	set("dt",1)}
+
+
+m = 1 & t > 100000 : {
+	//print ( "End: Cells=", cells, " ,Diffusion=", a, " ,Degradation=", b),
+	reset(),
+	t := 0,
+	n := n + 1,
+	//fprint (cp, n, ", ", num_cells, ", ", dor_cells, ", ", dead_cells, "\n"),
+	m := 0
+}
+
+//Record
+
+L := {};
+Li := {};
+stats := [num := 0, mean := 0, std := 0, sum := 0];
+
+s >= 100 & m = 1 :{
+		s := 0,
+		L := maptocells mode end,
+		stats := statistics L,
+		fprint (sp, n, ", ", t, ", ", stats.num, ", ", stats.mean, ", ", stats.std, ", ", stats.sum, ", ", num_cells, "\n")
+		//fprint (cp, t, ", ", n, ", ", num_cells, ", ", ext_glucose, ", ", dead_cells, "\n")
+		}
+
+};
+
+//ecoli ([x:=0, y:=0], program p());
+

@@ -1,0 +1,131 @@
+include gro
+
+cp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/signals.csv", "w" );
+
+fun div x y . x / y;
+
+set ("dt", 0.01);
+set("population_max", 20000);
+set("ecoli_growth_rate", 0.5);
+
+//set("signal_grid_width", 5000);
+//set("signal_grid_height", 5000);
+//set("signal_element_size", 1);
+
+max_cells := 0;
+num_cells := 1;
+
+sig_dif := 20;
+sig_deg := 5;
+sig_emi := 0.4;
+sig_det := 1;
+
+yes := 0;
+
+EDF := signal (sig_dif,sig_deg);
+
+dead_cells := 0;
+total_cells := 0;
+
+timestep := 0.01;
+
+
+program p() := {
+	gfp := 0;
+	die := 0;
+
+r := [ t:=0, s:=0];
+	true :{r.t := r.t + dt, r.s := r.s + dt}
+
+
+r.t >= 1 : {emit_signal(EDF,sig_emi)}
+get_signal (EDF) > sig_det & rate (100) : {yes := 1, gfp := 50*volume}
+num_cells >= max_cells & get_signal (EDF) > sig_det & rate (0.01*rand(10)) : {sig_emi := 0.8}
+
+num_cells >= max_cells & get_signal (EDF) > sig_det & rate (0.01*rand(10)) : {die := 1, dead_cells := dead_cells + 1}
+die = 1 & rate (100) : {die()}
+
+get_signal (EDF) < sig_det & rate (100) : {yes := 0, gfp := 0}
+
+daughter : {num_cells := num_cells + 1}
+num_cells >= max_cells : {set("ecoli_growth_rate", 0)}
+
+selected :{
+	//print ("sig_deg=", sig_deg, "sig_dif=", sig_dif, "yes=", yes)
+	print (yes)
+}
+
+
+};
+
+
+program main() := {
+
+	t := 0;
+	s := 0;
+	p := 0;
+	
+	needs gfp;
+	
+	true :{t := t + dt, s := s + dt, p := p + dt}
+
+	rate (100) : {total_cells := num_cells - dead_cells}
+
+//Repeat
+
+	mode := 0;
+	t := 0;
+	n := 0;
+	a := 0;
+	b := 200;
+	cells := 1;
+	perc_viable := 0;
+
+mode = 0 & n < 11 : {
+
+	ecoli ([x:=0, y:=0], program p()),
+	num_cells := 1,
+	dead_cells := 0,
+	total_cells := 1,
+	max_cells := rand(2000) +100,
+	perc_viable := 0,
+	mode := 1
+}
+
+mode = 0 & n = 11 : {
+	exit()
+}
+
+mode = 1 & t > 100 : {
+	//print ( "End: Cells=", cells, " ,Diffusion=", a, " ,Degradation=", b),
+	reset(),
+	t := 0,
+	n := n + 1,
+	perc_viable := 100*(div total_cells num_cells),
+	fprint (cp, n, ", ", num_cells, ", ", total_cells, ", ", perc_viable, "\n"),
+	mode := 0
+}
+
+//Record
+
+//s >= 1 :{
+		//s := 0,
+		//fprint (sp, p, ", ", stats.num, ", ", stats.mean, ", ", stats.std, "\n"),
+		//fprint (cp, p, ", ", num_cells, ", ", dead_cells, ", ", total_cells, "\n")
+		//}
+
+};
+
+//ecoli ([x:=0, y:=0], program p());
+
+//m := rand(450)-250;
+//n := rand(450)-250;
+
+//foreach q in range num_cells do
+//ecoli ( [ 
+//x := m, 
+//y := n, 
+//theta := 0],
+//program p())
+//end;
+

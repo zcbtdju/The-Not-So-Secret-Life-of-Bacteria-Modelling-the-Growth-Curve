@@ -1,0 +1,88 @@
+include gro
+
+fp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/final_model_info.csv", "w" );
+sp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/final_model_stats.csv", "w" );
+
+set("ecoli_growth_rate",0.0);
+set ("dt", 0.01);
+set("population_max", 20000);
+
+fun expo_decay a b c . a * (0.5)^( b / c );
+fun FtsZ_degradation a . -980.12523*log(a) + 8826.63198;
+fun div a b . a / b;
+fun monod_s a b c d . a * (( b * c )/( d + c ));
+fun monod_c b c d . (( b * c )/( d + c ));
+fun dormancy a b c d . a * b *((2.71828)^(c * d));
+fun cell_death a b c . a * ((2.71828)^(- b * c ));
+fun death_miu_rate a . 0.21 * ((2.71828)^( 1 * a ));
+
+extracellular_glucose := 2;	//g/L	20 ~1,0000 cell population
+
+timestep := 0.01;
+num_cells := 1;
+
+FtsZ_gene := 1152;		//bp - FtsZ gene length
+FtsZ_protein := 383;	//aa - FtsZ protein length
+nuc_per_rib := 60;		//nucleotides per ribosome
+FtsZ_mRNA_max := 3;		//max FtsZ mRNA
+mRNA_half_life := 10; 	//minutes
+FtsZ_max := 6000;		//Copies of protein per cell
+
+FtsZ_timer := 0;
+
+transcription_rate := timestep*0.6613756614;		//1000bp/1512bp gene length
+translation_rate := timestep*15.03916449;			//300aa/383aa protein * 1152bp/60bp
+glycogen_limit := 55316397.24;						//glycogen converted to glucose
+
+glucose_uti_log := 7941011;
+glucose_uti_lag := 397050.5333;
+glucose_uti_tran := 795934.5877;
+glucose_uti_stationary := 397050.5333;
+glucose_uti_death := 102457.6389;
+glucose_uti_dormant := 1024.576389;
+glucose_uti_lag_expo := 3560759.998;
+
+
+
+program p() := {
+
+check := 0;
+mode := 0;
+time := 0;
+r := [t:=0, s:=0];
+	true :{r.t := r.t + dt, r.s := r.s + dt}
+	true : {time := r.t}
+
+
+//lag phase
+
+FtsZ := 0;
+FtsZ_mRNA := 0;
+glycogen := 55316397.24;
+glycogen_ratio := 1;
+
+lag := 1.0E+5;
+
+extracellular_glucose > 0 : {FtsZ_mRNA := FtsZ_mRNA + transcription_rate}
+FtsZ_mRNA + transcription_rate >= FtsZ_mRNA_max : {FtsZ_mRNA := FtsZ_mRNA_max}
+
+extracellular_glucose = 0 : {FtsZ_mRNA := expo_decay FtsZ_mRNA_max time mRNA_half_life}
+extracellular_glucose = 0 & FtsZ_mRNA < 0.001 : {FtsZ_mRNA := 0}
+
+	FtsZ_mRNA < 0.1 : {glycogen_ratio := 0.5 * (div glycogen glycogen_limit) + 0.5}
+extracellular_glucose > 0 : {FtsZ := FtsZ + translation_rate*FtsZ_mRNA*glycogen_ratio}
+FtsZ + translation_rate*FtsZ_mRNA*glycogen_ratio >= FtsZ_max : {FtsZ := FtsZ_max}
+
+extracellular_glucose = 0 : {FtsZ_timer := FtsZ_timer + timestep*1}
+extracellular_glucose = 0 : {FtsZ := (FtsZ_degradation FtsZ_timer)}
+extracellular_glucose = 0 & FtsZ <= 0 : {FtsZ := 0}
+extracellular_glucose > 0 : {FtsZ_timer := 0}
+
+FtsZ = FtsZ_max : {lag := 0}
+
+r.t > 0.5 & lag > 0 : {glycogen := glycogen - glucose_uti_lag}
+glycogen - glucose_uti_lag <= 0 : {glycogen := 0}
+
+};
+
+ecoli ([x:=0, y:=0], program p());

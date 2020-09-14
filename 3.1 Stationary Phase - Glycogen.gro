@@ -1,0 +1,153 @@
+include gro
+
+fp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/glycogen_info.csv", "w" );
+sp := fopen ( "C:/Users/Daniel/Documents/Gro-LIA/GRO-LIA-master/0.1 Data/glycogen_stats.csv", "w" );
+
+set("ecoli_growth_rate",0.0);
+set ("dt", 0.01);
+set("population_max", 20000);
+
+fun div x y . x / y;
+fun dormancy a b c d . a * b *((2.71828)^(c * d));
+fun cell_death a b c . a * b * ((2.71828)^((-b*c)));
+fun statistics L .
+	let n := length(L), mu := (sumlist L) / n in
+		[ num := n, mean := mu, std := sqrt (sumlist (map (\ x . (x-mu)^2) L) / n), sum := sumlist L ]
+	end;
+
+glycogen_limit := 41891294.09;
+
+glucose_uti_lag_expo := 3560759.998;
+glucose_uti_tran := 795934.5877;
+glucose_uti_expo := 102457.6389;
+glucose_uti_dorm := 1024.576389;
+
+num_cells := 0;
+dor_cells := 0;
+max_cells := 1000;
+dead_cells := 0;
+total_cells := 0;
+
+ext_glucose := 0;
+
+timestep := 0.01;
+
+program p() := {
+	mode := 0;
+	yfp := 0;
+	
+	glycogen_store := 0;
+		
+	daughter : {num_cells + 1}
+	
+	r := [ t:=0, s:=0];
+	true :{r.t := r.t + dt, r.s := r.s + dt}
+	
+	ext_glucose > 0 : {set("ecoli_growth_rate", 0.034), mode := 1}
+	
+	mode = 1 : {glycogen_store := glycogen_limit}
+	mode = 1 & rate (100) : {ext_glucose := ext_glucose - timestep*glucose_uti_lag_expo}
+	ext_glucose - timestep*glucose_uti_lag_expo < 0 : {ext_glucose := 0}
+	mode = 1 : {yfp := 200*volume, glycogen_store := glycogen_limit}
+	
+	
+	ext_glucose = 0 & glycogen_store > 0 : {mode := 2}
+	mode = 2 : {glycogen_store:= glycogen_store - timestep*glucose_uti_tran, set("ecoli_growth_rate", 0.034*0.25)}
+	
+	//mode = 2 & just_divided : {glycogen := glycogen}
+	glycogen_store - timestep*glucose_uti_tran <= 0 : {glycogen_store := 0}
+	
+
+	ext_glucose = 0 & glycogen_store = 0 : {mode := 3, set("ecoli_growth_rate", 0)}
+	
+	selected :{
+	print("mode=", mode, " glycogen_store=", glycogen_store, " ext_glucose=", ext_glucose, " r=", r.t, " yfp=", yfp)
+	}
+
+//r.t = 200 :{
+//		r.t := 0,
+//		fprint (cp, r.s, ", ", mode, ", ", num_cells, ", ", ext_glucose, ", ", glycogen_store, "\n")
+//		}
+	yfp_conc := 0;
+	rate (100) : {yfp_conc := div yfp volume}
+
+r.t >= 1 & id = 0 :{
+		r.t := 0,
+		fprint (fp, r.s, ", ", yfp, ", ", volume, ", ", yfp_conc, ", ", glycogen_store, ", ", ext_glucose, "\n")
+		}
+
+};
+
+program main() := {
+
+	percentage_dormant := 0;
+	t := 0;
+	s := 0;
+	
+	true : {t := t + dt, s := s + dt}
+	
+	
+//t >= 0 : {
+//    t := 0,
+//    clear_messages(1),
+//    message ( 1, "Dormant Cells = " <> tostring(dor_cells) <> "." ),
+//	};
+
+//repeat
+
+	m := 0;
+	n := 0;
+	
+	
+m = 0 & n < 11 : {
+
+	ecoli ([x:=0, y:=0], program p());
+
+	
+//foreach q in range num_cells do
+//ecoli ( [ 
+//x := rand(500)-250, 
+//y := rand(500)-250, 
+//theta := 0.01*rand(314) ], 
+//program p())
+//end,
+	
+	ext_glucose := 20.0E+8*n*n,
+	num_cells := 1,
+	dor_cells := 0,
+	max_cells := 1000,
+	dead_cells := 0,
+	total_cells := 0,
+	m := 1
+}
+
+m = 0 & n = 11 : {
+	exit()
+}
+
+m = 1 & t > 350 : {
+	//print ( "End: Cells=", cells, " ,Diffusion=", a, " ,Degradation=", b),
+	reset(),
+	t := 0,
+	n := n + 1,
+	//fprint (cp, n, ", ", num_cells, ", ", dor_cells, ", ", dead_cells, "\n"),
+	m := 0
+}
+
+//Record
+
+L := {};
+stats := [num := 0, mean := 0, std := 0, sum := 0];
+
+s >= 1 & m = 1 :{
+		s := 0,
+		L := maptocells glycogen_store end,
+		stats := statistics L,
+		fprint (sp, n, ", ", t, ", ", stats.num, ", ", stats.mean, ", ", stats.std, ", ", stats.sum, ", ", ext_glucose, "\n")
+		//fprint (cp, t, ", ", n, ", ", num_cells, ", ", ext_glucose, ", ", dead_cells, "\n")
+		}
+
+};
+
+//ecoli ([x:=0, y:=0], program p());
+
